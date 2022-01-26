@@ -90,65 +90,65 @@ ax.set(xlabel='Head-Tail measurement (pixel)', ylabel='count')
 plt.text(170,30,'mean={:.1f}\n'.format(np.mean(list(length_pxl_manual.values()))) + ' var={:.1f}\n'.format(np.var(list(length_pxl_manual.values()))))
 
 
-# %% Interaction pattern
+# %% Collision pattern
 
 # start and end time of interaction computed
 start = fm.Query.GetDataInformations(e_manual).Start.Add(fm.Duration(23*3600*10**9))
-end = start.Add(fm.Duration(5*3600*10**9))
+end = start.Add(fm.Duration(0.5*3600*10**9))
 
 #%%
 # compute ant interaction
-#[trj_man, int_list_manual] = fm.Query.ComputeAntInteractions(e_manual, start=start, end=end)
-#[trj_auto, int_list_auto] = fm.Query.ComputeAntInteractions(e_auto, start=start, end=end)
+#[trj_man, coll_list_manual] = fm.Query.ComputeAntInteractions(e_manual, start=start, end=end)
+#[trj_auto, coll_list_auto] = fm.Query.ComputeAntInteractions(e_auto, start=start, end=end)
 
 
-# copute interactions per each frame int_frame
-# access via int_frame[#frame_num][1].Collisions[#interaction_num].IDs
+# copute interactions per each frame coll_frame
+# access via coll_frame[#frame_num][1].Collisions[#interaction_num].IDs
 # interaction between ID1 and ID2 is uniquily represented as ID1 * 10*4 + ID2
-int_frame_manual = [[i.IDs[0] * 10**4 + i.IDs[1] for i in frame[1].Collisions] for frame in fm.Query.CollideFrames(e_manual,start=start,end=end)]
-int_frame_auto = [[i.IDs[0] * 10**4 + i.IDs[1] for i in frame[1].Collisions] for frame in fm.Query.CollideFrames(e_auto,start=start,end=end)]
+coll_frame_manual = [[i.IDs[0] * 10**4 + i.IDs[1] for i in frame[1].Collisions] for frame in fm.Query.CollideFrames(e_manual,start=start,end=end)]
+coll_frame_auto = [[i.IDs[0] * 10**4 + i.IDs[1] for i in frame[1].Collisions] for frame in fm.Query.CollideFrames(e_auto,start=start,end=end)]
 
 #compute difference
-int_m_a = [list(set.difference(set(int_frame_manual[f]),set(int_frame_auto[f]))) for f in range(len(int_frame_auto))]
-int_a_m = [list(set.difference(set(int_frame_auto[f]),set(int_frame_manual[f]))) for f in range(len(int_frame_auto))]
-int_aum = [list(set.union(set(int_frame_manual[f]),set(int_frame_auto[f]))) for f in range(len(int_frame_auto))]
+coll_m_a = [list(set.difference(set(coll_frame_manual[f]),set(coll_frame_auto[f]))) for f in range(len(coll_frame_auto))]
+coll_a_m = [list(set.difference(set(coll_frame_auto[f]),set(coll_frame_manual[f]))) for f in range(len(coll_frame_auto))]
+coll_aum = [list(set.union(set(coll_frame_manual[f]),set(coll_frame_auto[f]))) for f in range(len(coll_frame_auto))]
 
-int_relative_err = [100 * (len(int_m_a[i]) + len(int_a_m[i])) / len(int_aum[i]) for i in range(len(int_aum)) if len(int_aum[i])>0]
+coll_relative_err = [100 * (len(coll_m_a[i]) + len(coll_a_m[i])) / len(coll_aum[i]) for i in range(len(coll_aum)) if len(coll_aum[i])>0]
 
 
 # %% plot ant length distribution
-ax = sns.histplot(int_relative_err,bins=50)
+ax = sns.histplot(coll_relative_err,bins=50)
 ax.set(xlabel='Mismatched interactions per frame (%)', ylabel='frames')
-plt.title(' from: ' + str(start) + '\n to: ' +str(end) + '\n mean={:.1f}, '.format(np.mean(int_relative_err)) + ' var={:.1f} '.format(np.var(int_relative_err)))
+plt.title(' from: ' + str(start) + '\n to: ' +str(end) + '\n mean={:.1f}, '.format(np.mean(coll_relative_err)) + ' var={:.1f} '.format(np.var(coll_relative_err)))
 
-# %% Correlation ant length and interaction mismatch
+# %% Correlation ant length and collision mismatch
 
-# interacctions detections scores per individual ants
+# collision detection scores per individual ants
 # List of all interactions, grouped by manual\auto, auto\manual and manual U auto
-all_int_m_a = [item for sublist in int_m_a for item in sublist]
-all_int_a_m = [item for sublist in int_a_m for item in sublist]
-all_int_aum = [item for sublist in int_aum for item in sublist]
+all_coll_m_a = [item for sublist in coll_m_a for item in sublist]
+all_coll_a_m = [item for sublist in coll_a_m for item in sublist]
+all_coll_aum = [item for sublist in coll_aum for item in sublist]
 
 
 ##  to do==> run the following for loop throught the all_init_* lists
-int_ant = {id:[((np.array(all_int_m_a) // 10**4)==id).sum() + ((np.array(all_int_m_a) % 10**4)==id).sum(), # number of interactions in manual, but not in auto
-                ((np.array(all_int_a_m) // 10**4)==id).sum() + ((np.array(all_int_a_m) % 10**4)==id).sum(), # number of interactions in auto, but not in manual
-                ((np.array(all_int_aum) // 10**4)==id).sum() + ((np.array(all_int_aum) % 10**4)==id).sum()]       # number of interactions in both auto and manual
+coll_ant = {id:[((np.array(all_coll_m_a) // 10**4)==id).sum() + ((np.array(all_coll_m_a) % 10**4)==id).sum(), # number of interactions in manual, but not in auto
+                ((np.array(all_coll_a_m) // 10**4)==id).sum() + ((np.array(all_coll_a_m) % 10**4)==id).sum(), # number of interactions in auto, but not in manual
+                ((np.array(all_coll_aum) // 10**4)==id).sum() + ((np.array(all_coll_aum) % 10**4)==id).sum()]       # number of interactions in both auto and manual
            for id in range(1,len(ants_auto)+1)}
 
 
 # compute relative detection in auto and manual
-int_ant_relative_err = pd.DataFrame([[ant, 100 * int_ant[ant][0] / int_ant[ant][2], 100 * int_ant[ant][1] / int_ant[ant][2], length_pxl_manual[ant]] for ant in int_ant if int_ant[ant][2]>0], columns=['ID', 'manual_collisions (%)', 'auto_collisions (%)', 'HT-length (pixels)'])
+coll_ant_relative_err = pd.DataFrame([[ant, 100 * coll_ant[ant][0] / coll_ant[ant][2], 100 * coll_ant[ant][1] / coll_ant[ant][2], length_pxl_manual[ant]] for ant in coll_ant if coll_ant[ant][2]>0], columns=['ID', 'manual_collisions (%)', 'auto_collisions (%)', 'HT-length (pixels)'])
 
 # scatter plot with color gradient as HT length
 fig, ax = plt.subplots()
 sns.set(font_scale = 2)
-sns.scatterplot(data=int_ant_relative_err, x='manual_collisions (%)',y='auto_collisions (%)',hue='HT-length (pixels)', s=120, palette=('rocket'), ax=ax)
+sns.scatterplot(data=coll_ant_relative_err, x='manual_collisions (%)',y='auto_collisions (%)',hue='HT-length (pixels)', s=120, palette=('rocket'), ax=ax)
 ax.set(ylim=(0,None), xlim=(0,None))
 plt.title(' from: ' + str(start) + '\n to: ' +str(end) )
 
 # add colorbar
-norm = plt.Normalize(int_ant_relative_err['HT-length (pixels)'].min(), int_ant_relative_err['HT-length (pixels)'].max())
+norm = plt.Normalize(coll_ant_relative_err['HT-length (pixels)'].min(), coll_ant_relative_err['HT-length (pixels)'].max())
 sm = plt.cm.ScalarMappable(cmap="rocket", norm=norm)
 sm.set_array([])
 
@@ -156,6 +156,42 @@ sm.set_array([])
 ax.get_legend().remove()
 cax = fig.add_axes([0.27, 0.8, 0.5, 0.05])
 ax.figure.colorbar(sm, shrink=0.8, label='HT-length (pixels)', cax=cax,orientation='horizontal')
+
+
+# %% Network comparison
+
+# Dictionary to convert timestamp of frame intoo corresponding frame number (with frame#0 at 'start' time)
+TimeToFrame = {fm.Time.ToTimestamp(frm[0].FrameTime): i for i,frm in enumerate(fm.Query.CollideFrames(e_manual,start=start,end=end))}
+
+# Compute list of interactions with pairs of ids (id1*10**4+id2) and start frame and end frame
+int_list = [[i.IDs[0]*10**4 + i.IDs[1], TimeToFrame[fm.Time.ToTimestamp(i.Start)], TimeToFrame[fm.Time.ToTimestamp(i.End)]] for i in fm.Query.ComputeAntInteractions(e_manual,start=start,end=end,maximumGap=fm.Duration(10*10**9))[1]]
+
+# pointer to list of all the possible ids pairs ordered 
+
+ids_pairs = [id1*10**4 + id2 for id1 in range(1,len(ants_auto)) for id2 in range(id1 + 1,len(ants_auto) + 1)]
+ids_pairs = {k: i for i,k in enumerate(ids_pairs)} #NOTE VERY NICE!! YOU CAN DO THIS IN ONE GO WITH PREVIOUS LINE (TO DO)
+
+
+#TO DO: search for ids pairs that match in int_list, and sum the corresponding binary vectors of collisions
+# Interaction matrix
+int_mat = [ids for ids in ids_pairs]
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 # %% training time-window vs accurancy plot
