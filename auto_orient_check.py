@@ -12,6 +12,8 @@ from circular_hist import circular_hist
 from angles import normalize
 from prime_generator import nth_prime_number
 import datetime
+import scipy.sparse as sparse
+from matplotlib.colors import ListedColormap
 
 # link to folder with data and myrmidon files
 #working_dir = '/media/eg15396/EG_DATA-2/NTM/'
@@ -74,7 +76,7 @@ data = pd.DataFrame({
     'x-offset (pixel)': offset_err[:,0],
     'y-offset (pixel)': offset_err[:,1],})
 lim = np.max(abs(offset_err))*1.1
-ax = sns.jointplot(data=data,x='x-offset (pixel)',y='y-offset (pixel)', xlim=(-lim,lim), ylim=(-lim,lim))
+ax1 = sns.jointplot(data=data,x='x-offset (pixel)',y='y-offset (pixel)', xlim=(-lim,lim), ylim=(-lim,lim))
 plt.text(0.8*lim,-0.9*lim,'y-mean={:.2f}\n'.format(offset_err[:,1].mean()) + 'y-var={:.2f}'.format(offset_err[:,1].var()), rotation=-90)
 plt.text(-2.5*lim,1.3*lim,'x-mean={:.2f}\n'.format(offset_err[:,0].mean()) + 'x-var={:.2f}'.format(offset_err[:,0].var()))
 
@@ -85,8 +87,8 @@ plt.text(-2.5*lim,1.3*lim,'x-mean={:.2f}\n'.format(offset_err[:,0].mean()) + 'x-
 length_pxl_manual = {a: np.mean([fm.Query.ComputeMeasurementFor(e_manual,antID=ants_manual[a].ID,measurementTypeID=1)[i].LengthPixel for i in range(2)])  for a in ants_manual}
 
 # plot ant length distribution
-ax = sns.histplot(length_pxl_manual)
-ax.set(xlabel='Head-Tail measurement (pixel)', ylabel='count')
+ax2 = sns.histplot(length_pxl_manual)
+ax2.set(xlabel='Head-Tail measurement (pixel)', ylabel='count')
 plt.text(170,30,'mean={:.1f}\n'.format(np.mean(list(length_pxl_manual.values()))) + ' var={:.1f}\n'.format(np.var(list(length_pxl_manual.values()))))
 
 
@@ -94,7 +96,7 @@ plt.text(170,30,'mean={:.1f}\n'.format(np.mean(list(length_pxl_manual.values()))
 
 # start and end time of interaction computed
 start = fm.Query.GetDataInformations(e_manual).Start.Add(fm.Duration(23*3600*10**9))
-end = start.Add(fm.Duration(0.5*3600*10**9))
+end = start.Add(fm.Duration(0.1*3600*10**9))
 
 #%%
 # compute ant interaction
@@ -142,8 +144,8 @@ coll_ant_relative_err = pd.DataFrame([[ant, 100 * coll_ant[ant][0] / coll_ant[an
 
 # scatter plot with color gradient as HT length
 fig, ax = plt.subplots()
-sns.set(font_scale = 2)
-sns.scatterplot(data=coll_ant_relative_err, x='manual_collisions (%)',y='auto_collisions (%)',hue='HT-length (pixels)', s=120, palette=('rocket'), ax=ax)
+sns.set(font_scale = 1)
+sns.scatterplot(data=coll_ant_relative_err, x='manual_collisions (%)',y='auto_collisions (%)',hue='HT-length (pixels)', s=80, palette=('rocket'), ax=ax)
 ax.set(ylim=(0,None), xlim=(0,None))
 plt.title(' from: ' + str(start) + '\n to: ' +str(end) )
 
@@ -160,22 +162,37 @@ ax.figure.colorbar(sm, shrink=0.8, label='HT-length (pixels)', cax=cax,orientati
 
 # %% Network comparison
 
-# Dictionary to convert timestamp of frame intoo corresponding frame number (with frame#0 at 'start' time)
-TimeToFrame = {fm.Time.ToTimestamp(frm[0].FrameTime): i for i,frm in enumerate(fm.Query.CollideFrames(e_manual,start=start,end=end))}
+# Dictionary to convert timestamp of frame into corresponding frame number starting from 1 (with frame#1 at 'start' time)
+TimeToFrame = {fm.Time.ToTimestamp(frm[0].FrameTime): i + 1 for i,frm in enumerate(fm.Query.CollideFrames(e_manual,start=start,end=end))}
+N_frm = len(TimeToFrame)
 
-# Compute list of interactions with pairs of ids (id1*10**4+id2) and start frame and end frame
-int_list = [[i.IDs[0]*10**4 + i.IDs[1], TimeToFrame[fm.Time.ToTimestamp(i.Start)], TimeToFrame[fm.Time.ToTimestamp(i.End)]] for i in fm.Query.ComputeAntInteractions(e_manual,start=start,end=end,maximumGap=fm.Duration(10*10**9))[1]]
+# maximum gap (s) for interaction computation
+max_gap = 10
 
 # pointer to list of all the possible ids pairs ordered 
 
 ids_pairs = [id1*10**4 + id2 for id1 in range(1,len(ants_auto)) for id2 in range(id1 + 1,len(ants_auto) + 1)]
-ids_pairs = {k: i for i,k in enumerate(ids_pairs)} #NOTE VERY NICE!! YOU CAN DO THIS IN ONE GO WITH PREVIOUS LINE (TO DO)
+ids_pairs = {k: i for i,k in enumerate(ids_pairs)} #NOT VERY NICE!! YOU CAN DO THIS IN ONE GO WITH PREVIOUS LINE (TO DO)
 
 
-#TO DO: search for ids pairs that match in int_list, and sum the corresponding binary vectors of collisions
-# Interaction matrix
-int_mat = [ids for ids in ids_pairs]
+#%%
+# inisialize interaction matrix each rows represent a binary array, one for each ids pairs, with 1s on the interactions and 0s elsewhere
+int_mat = np.zeros((len(ids_pairs), N_frm + 2))
 
+
+for i in fm.Query.ComputeAntInteractions(e_manual,start=start,end=end,maximumGap=fm.Duration(max_gap*10**9))[1]:
+    ids = i.IDs[0]*10**4 + i.IDs[1]
+    int_mat[ids_pairs[ids]] += np.concatenate([np.zeros((1,TimeToFrame[fm.Time.ToTimestamp(i.Start)])), 
+                                               np.ones((1,TimeToFrame[fm.Time.ToTimestamp(i.End)] - TimeToFrame[fm.Time.ToTimestamp(i.Start)] + 1)),
+                                               np.zeros((1,N_frm - TimeToFrame[fm.Time.ToTimestamp(i.End)] + 1))], 1)[0]
+    
+
+# %% plot interaction matrix
+
+plt.imshow(200*int_mat[:2000,:], cmap='cividis')
+plt.grid(None)
+plt.xlabel('Frame')
+plt.ylabel('ant_pair')
 
 
 
