@@ -14,6 +14,9 @@ from prime_generator import nth_prime_number
 import datetime
 import scipy.sparse as sparse
 from matplotlib.colors import ListedColormap
+import networkx as nx
+import community
+import statistics
 
 # link to folder with data and myrmidon files
 #working_dir = '/media/eg15396/EG_DATA-2/NTM/'
@@ -29,7 +32,7 @@ manual_orient = 'NTM_s30_man_orient.myrmidon'
 #manual_orient = 'R3SP_13-03-21_Capsule_Zones_defined.myrmidon'
 
 
-# %% Load experiment
+# % Load experiment
 
 # open experiments
 e_auto = fm.Experiment.Open(working_dir + auto_orient)
@@ -38,6 +41,8 @@ e_manual = fm.Experiment.Open(working_dir + manual_orient)
 # open ants
 ants_auto = e_auto.Ants
 ants_manual = e_manual.Ants
+
+N_ants = len(ants_auto)
 
 #%% Tag Angle
 
@@ -96,7 +101,7 @@ plt.text(170,30,'mean={:.1f}\n'.format(np.mean(list(length_pxl_manual.values()))
 
 # start and end time of interaction computed
 start = fm.Query.GetDataInformations(e_manual).Start.Add(fm.Duration(23*3600*10**9))
-end = start.Add(fm.Duration(0.1*3600*10**9))
+end = start.Add(fm.Duration(2*3600*10**9))
 
 #%%
 # compute ant interaction
@@ -144,8 +149,8 @@ coll_ant_relative_err = pd.DataFrame([[ant, 100 * coll_ant[ant][0] / coll_ant[an
 
 # scatter plot with color gradient as HT length
 fig, ax = plt.subplots()
-sns.set(font_scale = 1)
-sns.scatterplot(data=coll_ant_relative_err, x='manual_collisions (%)',y='auto_collisions (%)',hue='HT-length (pixels)', s=80, palette=('rocket'), ax=ax)
+sns.set(font_scale = 2)
+sns.scatterplot(data=coll_ant_relative_err, x='manual_collisions (%)',y='auto_collisions (%)',hue='HT-length (pixels)', s=120, palette=('rocket'), ax=ax)
 ax.set(ylim=(0,None), xlim=(0,None))
 plt.title(' from: ' + str(start) + '\n to: ' +str(end) )
 
@@ -160,66 +165,230 @@ cax = fig.add_axes([0.27, 0.8, 0.5, 0.05])
 ax.figure.colorbar(sm, shrink=0.8, label='HT-length (pixels)', cax=cax,orientation='horizontal')
 
 
-# %% Network comparison
+# %% Interaction comparison
+
+# start and end time of interaction computed
+start = fm.Query.GetDataInformations(e_manual).Start.Add(fm.Duration(23*3600*10**9))
+end = start.Add(fm.Duration(0.5*3600*10**9))
+
 
 # Dictionary to convert timestamp of frame into corresponding frame number starting from 1 (with frame#1 at 'start' time)
 TimeToFrame = {fm.Time.ToTimestamp(frm[0].FrameTime): i + 1 for i,frm in enumerate(fm.Query.CollideFrames(e_manual,start=start,end=end))}
 N_frm = len(TimeToFrame)
 
 # maximum gap (s) for interaction computation
-max_gap = 10
+max_gap = 20
+int_err_per_frame = []
 
-# pointer to list of all the possible ids pairs ordered 
+for mg_i, max_gap in enumerate(range(1,200,3)):
+    print(max_gap)
 
-ids_pairs = [id1*10**4 + id2 for id1 in range(1,len(ants_auto)) for id2 in range(id1 + 1,len(ants_auto) + 1)]
-ids_pairs = {k: i for i,k in enumerate(ids_pairs)} #NOT VERY NICE!! YOU CAN DO THIS IN ONE GO WITH PREVIOUS LINE (TO DO)
-
-
-#%%
-# inisialize interaction matrix each rows represent a binary array, one for each ids pairs, with 1s on the interactions and 0s elsewhere
-int_mat = np.zeros((len(ids_pairs), N_frm + 2))
-
-
-for i in fm.Query.ComputeAntInteractions(e_manual,start=start,end=end,maximumGap=fm.Duration(max_gap*10**9))[1]:
-    ids = i.IDs[0]*10**4 + i.IDs[1]
-    int_mat[ids_pairs[ids]] += np.concatenate([np.zeros((1,TimeToFrame[fm.Time.ToTimestamp(i.Start)])), 
-                                               np.ones((1,TimeToFrame[fm.Time.ToTimestamp(i.End)] - TimeToFrame[fm.Time.ToTimestamp(i.Start)] + 1)),
-                                               np.zeros((1,N_frm - TimeToFrame[fm.Time.ToTimestamp(i.End)] + 1))], 1)[0]
+    # pointer to list of all the possible ids pairs ordered 
+    ids_pairs = [id1*10**4 + id2 for id1 in range(1,len(ants_auto)) for id2 in range(id1 + 1,len(ants_auto) + 1)]
+    ids_pairs = {k: i for i,k in enumerate(ids_pairs)} #NOT VERY NICE!! YOU CAN DO THIS IN ONE GO WITH PREVIOUS LINE (TO DO)
     
+    
+    # inisialize interaction matrix each rows represent a binary array, one for each ids pairs, with 1s on the interactions and 0s elsewhere
+    int_mat_manual = np.zeros((len(ids_pairs), N_frm + 2), dtype=bool)
+    int_mat_auto = np.zeros((len(ids_pairs), N_frm + 2), dtype=bool)
+    
+    
+    # Manual              <---- to improve: merge in one for loop!!
+    for i in fm.Query.ComputeAntInteractions(e_manual,start=start,end=end,maximumGap=fm.Duration(max_gap*10**9))[1]:
+        ids = i.IDs[0]*10**4 + i.IDs[1]
+        int_mat_manual[ids_pairs[ids]] += np.concatenate([np.zeros((1,TimeToFrame[fm.Time.ToTimestamp(i.Start)])), 
+                                                   np.ones((1,TimeToFrame[fm.Time.ToTimestamp(i.End)] - TimeToFrame[fm.Time.ToTimestamp(i.Start)] + 1)),
+                                                   np.zeros((1,N_frm - TimeToFrame[fm.Time.ToTimestamp(i.End)] + 1))], 1)[0].astype(bool)
+    
+    # Auto
+    for i in fm.Query.ComputeAntInteractions(e_auto,start=start,end=end,maximumGap=fm.Duration(max_gap*10**9))[1]:
+        ids = i.IDs[0]*10**4 + i.IDs[1]
+        int_mat_auto[ids_pairs[ids]] += np.concatenate([np.zeros((1,TimeToFrame[fm.Time.ToTimestamp(i.Start)])), 
+                                                   np.ones((1,TimeToFrame[fm.Time.ToTimestamp(i.End)] - TimeToFrame[fm.Time.ToTimestamp(i.Start)] + 1)),
+                                                   np.zeros((1,N_frm - TimeToFrame[fm.Time.ToTimestamp(i.End)] + 1))], 1)[0].astype(bool)
+        
+    int_mat_err = sparse.csr_matrix(int_mat_manual.astype(int) - int_mat_auto.astype(int))
+    
+    int_err_per_frame.append([(int_mat_err==1).sum() / N_frm, (int_mat_err==-1).sum() / N_frm])
+
 
 # %% plot interaction matrix
+# max interaction to show
+ylim = 2000
 
-plt.imshow(200*int_mat[:2000,:], cmap='cividis')
+# show yticks every
+ytick_span = 70
+plt.imshow(200*int_mat_auto[:ylim,:], cmap='cividis')
 plt.grid(None)
 plt.xlabel('Frame')
 plt.ylabel('ant_pair')
+plt.title('AUTO - max gap = ' + str(max_gap) + 's \n from: ' + str(start) + '\n to: ' +str(end) )
+plt.yticks(range(0, ylim, ytick_span), ['(' + str(ids // 10**4) + ', ' + str(ids % 10**4) + ')' for ids in ids_pairs][:ylim:ytick_span])
+
+
+# %% plot interaction patter error
+# max interaction to show
+ylim = 2000
+
+# show yticks every
+ytick_span = 70
+plt.imshow(200*int_mat_err[:ylim,:4000], cmap='cividis')
+plt.grid(None)
+plt.xlabel('Frame')
+plt.ylabel('ant_pair')
+plt.title('DIFFERENCE - max gap = ' + str(max_gap) + 's \n from: ' + str(start) + '\n to: ' +str(end) )
+plt.yticks(range(0, ylim, ytick_span), ['(' + str(ids // 10**4) + ', ' + str(ids % 10**4) + ')' for ids in ids_pairs][:ylim:ytick_span])
 
 
 
+# %% CUMULATIVE NETWORK VISUAL COMPARISON
+
+# ------- parameters -----------
+
+# cumulative time window (s)
+time_win = 60 * 30
+
+# maximum gap (s) for interaction computation
+max_gap = 20
+
+# minimum cumulative interaction duration (s)
+min_cum_duration = 100
+
+# -----------------------------
 
 
 
+# start and end time of interaction computed
+start = fm.Query.GetDataInformations(e_manual).Start.Add(fm.Duration(23*3600*10**9))
+end = start.Add(fm.Duration(time_win * 10**9))
+
+# Dictionary to convert timestamp of frame into corresponding frame number starting from 1 (with frame#1 at 'start' time)
+TimeToFrame = {fm.Time.ToTimestamp(frm[0].FrameTime): i + 1 for i,frm in enumerate(fm.Query.CollideFrames(e_manual,start=start,end=end))}
+N_frm = len(TimeToFrame)
+
+#initialise adj-matrix
+adj_manual = np.zeros((N_ants, N_ants))
+adj_auto = np.zeros((N_ants, N_ants))
 
 
+# Manual
+for i in fm.Query.ComputeAntInteractions(e_manual,start=start,end=end,maximumGap=fm.Duration(max_gap*10**9))[1]:
+    adj_manual[i.IDs[0]-1, i.IDs[1]-1] += TimeToFrame[fm.Time.ToTimestamp(i.End)] - TimeToFrame[fm.Time.ToTimestamp(i.Start)]
+
+# Auto
+for i in fm.Query.ComputeAntInteractions(e_auto,start=start,end=end,maximumGap=fm.Duration(max_gap*10**9))[1]:
+    adj_auto[i.IDs[0]-1, i.IDs[1]-1] += TimeToFrame[fm.Time.ToTimestamp(i.End)] - TimeToFrame[fm.Time.ToTimestamp(i.Start)]
+
+# trimming 
+adj_manual[adj_manual < min_cum_duration] = 0
+adj_auto[adj_auto < min_cum_duration] = 0
+
+# network build
+G_manual = nx.Graph(adj_manual)
+G_auto = nx.Graph(adj_auto)
+
+# select connencted components
+Gcc_manual = sorted(nx.connected_components(G_manual), key=len, reverse=True)
+Gcc_auto = sorted(nx.connected_components(G_auto), key=len, reverse=True)
+
+GC_manual = G_manual.subgraph(Gcc_manual[0])
+GC_auto = G_auto.subgraph(Gcc_auto[0])
 
 
+#%% PLOTTING network comparison
+# starting node position for spring layout
+start_pos = nx.random_layout(G_manual)
+
+# manual 
+pos = nx.spring_layout(GC_manual,  iterations=100, pos=start_pos)
+ax = plt.subplot(121)
+nx.draw(GC_manual, ax=ax, pos=pos)
+plt.title('MANUAL - CC = ' +str(len(Gcc_manual)))
 
 
+# auto
+pos = nx.spring_layout(GC_auto,  iterations=100, pos=start_pos)
+ax = plt.subplot(122)
+nx.draw(GC_auto, ax=ax, pos=pos)
+plt.title('AUTO - CC = ' +str(len(Gcc_auto)))
+
+plt.suptitle('max gap = ' + str(max_gap) + 's, min edge = ' +str(min_cum_duration) + 's  \n from: ' + str(start) + '\n to: ' +str(end))
+
+# %% CUMULATIVE NETWORK PROPERTIES COMPARISON
+
+# ------- parameters -----------
+
+# cumulative time window (s)
+time_win = 60 * 30
+
+# maximum gap (s) for interaction computation
+max_gap = 20
+
+# minimum cumulative interaction duration (frames)
+min_cum_duration = 10*6
+
+# -----------------------------
+
+# properties dataframe
+prop_df_manual = pd.DataFrame(columns=['start', 'end', 'MOD', 'DEN', 'DIA', 'DEH'])
+prop_df_auto = pd.DataFrame(columns=['start', 'end', 'MOD', 'DEN', 'DIA', 'DEH'])
+
+# start and end time of interaction computed
+start = fm.Query.GetDataInformations(e_manual).Start.Add(fm.Duration(23*3600*10**9))
+end = start.Add(fm.Duration(time_win * 10**9))
+
+# Dictionary to convert timestamp of frame into corresponding frame number starting from 1 (with frame#1 at 'start' time)
+TimeToFrame = {fm.Time.ToTimestamp(frm[0].FrameTime): i + 1 for i,frm in enumerate(fm.Query.CollideFrames(e_manual,start=start,end=end))}
+N_frm = len(TimeToFrame)
+
+#initialise adj-matrix
+adj_manual = np.zeros((N_ants, N_ants))
+adj_auto = np.zeros((N_ants, N_ants))
 
 
+# Manual
+for i in fm.Query.ComputeAntInteractions(e_manual,start=start,end=end,maximumGap=fm.Duration(max_gap*10**9))[1]:
+    adj_manual[i.IDs[0]-1, i.IDs[1]-1] += TimeToFrame[fm.Time.ToTimestamp(i.End)] - TimeToFrame[fm.Time.ToTimestamp(i.Start)]
+
+# Auto
+for i in fm.Query.ComputeAntInteractions(e_auto,start=start,end=end,maximumGap=fm.Duration(max_gap*10**9))[1]:
+    adj_auto[i.IDs[0]-1, i.IDs[1]-1] += TimeToFrame[fm.Time.ToTimestamp(i.End)] - TimeToFrame[fm.Time.ToTimestamp(i.Start)]
+
+# trimming 
+adj_manual[adj_manual < min_cum_duration] = 0
+adj_auto[adj_auto < min_cum_duration] = 0
+
+# network build
+G_manual = nx.Graph(adj_manual)
+G_auto = nx.Graph(adj_auto)
+
+# select connencted components
+cc_manual = sorted(nx.connected_components(G_manual), key=len, reverse=True)
+cc_auto = sorted(nx.connected_components(G_auto), key=len, reverse=True)
+GC_manual = G_manual.subgraph(cc_manual[0])
+GC_auto = G_auto.subgraph(cc_auto[0])
+
+# save properties
+prop_df_manual = prop_df_manual.append({'start': start, 
+                                        'end': end, 
+                                        'MOD': community.modularity(community.best_partition(GC_manual,randomize=False), GC_manual), 
+                                        'DEN': nx.density(GC_manual), 
+                                        'DIA': nx.diameter(GC_manual), 
+                                        'DEH': statistics.pvariance([GC_manual.degree(n) for n in GC_manual.nodes()])},
+                                       ignore_index=True)
+
+prop_df_auto = prop_df_auto.append({'start': start, 
+                                    'end': end, 
+                                    'MOD': community.modularity(community.best_partition(GC_auto,randomize=False), GC_auto), 
+                                    'DEN': nx.density(GC_auto), 
+                                    'DIA': nx.diameter(GC_auto), 
+                                    'DEH': statistics.pvariance([GC_auto.degree(n) for n in GC_auto.nodes()])},
+                                   ignore_index=True)
 
 
+#   TO DO------------------  implement for loop over time and visualise properties differences
 
-
-# %% training time-window vs accurancy plot
-
-
-
-
-
-
-
-
+[[c, prop_df_manual[c][0], prop_df_auto[c][0]] for c in prop_df_auto.columns]
 
 
 
