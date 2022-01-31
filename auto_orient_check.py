@@ -321,6 +321,9 @@ plt.suptitle('max gap = ' + str(max_gap) + 's, min edge = ' +str(min_cum_duratio
 # cumulative time window (s)
 time_win = 60 * 30
 
+# number of networks computed
+num_net = 20
+
 # maximum gap (s) for interaction computation
 max_gap = 20
 
@@ -330,69 +333,74 @@ min_cum_duration = 10*6
 # -----------------------------
 
 # properties dataframe
-prop_df_manual = pd.DataFrame(columns=['start', 'end', 'MOD', 'DEN', 'DIA', 'DEH'])
-prop_df_auto = pd.DataFrame(columns=['start', 'end', 'MOD', 'DEN', 'DIA', 'DEH'])
+prop_df = pd.DataFrame(columns=[])
 
 # start and end time of interaction computed
-start = fm.Query.GetDataInformations(e_manual).Start.Add(fm.Duration(23*3600*10**9))
-end = start.Add(fm.Duration(time_win * 10**9))
-
-# Dictionary to convert timestamp of frame into corresponding frame number starting from 1 (with frame#1 at 'start' time)
-TimeToFrame = {fm.Time.ToTimestamp(frm[0].FrameTime): i + 1 for i,frm in enumerate(fm.Query.CollideFrames(e_manual,start=start,end=end))}
-N_frm = len(TimeToFrame)
-
-#initialise adj-matrix
-adj_manual = np.zeros((N_ants, N_ants))
-adj_auto = np.zeros((N_ants, N_ants))
+t0 = fm.Query.GetDataInformations(e_manual).Start.Add(fm.Duration(23*3600*10**9))
 
 
-# Manual
-for i in fm.Query.ComputeAntInteractions(e_manual,start=start,end=end,maximumGap=fm.Duration(max_gap*10**9))[1]:
-    adj_manual[i.IDs[0]-1, i.IDs[1]-1] += TimeToFrame[fm.Time.ToTimestamp(i.End)] - TimeToFrame[fm.Time.ToTimestamp(i.Start)]
+for net in range(num_net):
+    start = t0.Add(fm.Duration(time_win * net * 10**9))
 
-# Auto
-for i in fm.Query.ComputeAntInteractions(e_auto,start=start,end=end,maximumGap=fm.Duration(max_gap*10**9))[1]:
-    adj_auto[i.IDs[0]-1, i.IDs[1]-1] += TimeToFrame[fm.Time.ToTimestamp(i.End)] - TimeToFrame[fm.Time.ToTimestamp(i.Start)]
+    end = t0.Add(fm.Duration(time_win * (net+1) * 10**9))
 
-# trimming 
-adj_manual[adj_manual < min_cum_duration] = 0
-adj_auto[adj_auto < min_cum_duration] = 0
+    # Dictionary to convert timestamp of frame into corresponding frame number starting from 1 (with frame#1 at 'start' time)
+    TimeToFrame = {fm.Time.ToTimestamp(frm[0].FrameTime): i + 1 for i,frm in enumerate(fm.Query.CollideFrames(e_manual,start=start,end=end))}
+    N_frm = len(TimeToFrame)
 
-# network build
-G_manual = nx.Graph(adj_manual)
-G_auto = nx.Graph(adj_auto)
-
-# select connencted components
-cc_manual = sorted(nx.connected_components(G_manual), key=len, reverse=True)
-cc_auto = sorted(nx.connected_components(G_auto), key=len, reverse=True)
-GC_manual = G_manual.subgraph(cc_manual[0])
-GC_auto = G_auto.subgraph(cc_auto[0])
-
-# save properties
-prop_df_manual = prop_df_manual.append({'start': start, 
-                                        'end': end, 
-                                        'MOD': community.modularity(community.best_partition(GC_manual,randomize=False), GC_manual), 
-                                        'DEN': nx.density(GC_manual), 
-                                        'DIA': nx.diameter(GC_manual), 
-                                        'DEH': statistics.pvariance([GC_manual.degree(n) for n in GC_manual.nodes()])},
-                                       ignore_index=True)
-
-prop_df_auto = prop_df_auto.append({'start': start, 
-                                    'end': end, 
-                                    'MOD': community.modularity(community.best_partition(GC_auto,randomize=False), GC_auto), 
-                                    'DEN': nx.density(GC_auto), 
-                                    'DIA': nx.diameter(GC_auto), 
-                                    'DEH': statistics.pvariance([GC_auto.degree(n) for n in GC_auto.nodes()])},
-                                   ignore_index=True)
+    #initialise adj-matrix
+    adj_manual = np.zeros((N_ants, N_ants))
+    adj_auto = np.zeros((N_ants, N_ants))
 
 
-#   TO DO------------------  implement for loop over time and visualise properties differences
+    # Manual
+    for i in fm.Query.ComputeAntInteractions(e_manual,start=start,end=end,maximumGap=fm.Duration(max_gap*10**9))[1]:
+        adj_manual[i.IDs[0]-1, i.IDs[1]-1] += TimeToFrame[fm.Time.ToTimestamp(i.End)] - TimeToFrame[fm.Time.ToTimestamp(i.Start)]
 
-[[c, prop_df_manual[c][0], prop_df_auto[c][0]] for c in prop_df_auto.columns]
+    # Auto
+    for i in fm.Query.ComputeAntInteractions(e_auto,start=start,end=end,maximumGap=fm.Duration(max_gap*10**9))[1]:
+        adj_auto[i.IDs[0]-1, i.IDs[1]-1] += TimeToFrame[fm.Time.ToTimestamp(i.End)] - TimeToFrame[fm.Time.ToTimestamp(i.Start)]
+    
+    # trimming 
+    adj_manual[adj_manual < min_cum_duration] = 0
+    adj_auto[adj_auto < min_cum_duration] = 0
+    
+    # network build
+    G_manual = nx.Graph(adj_manual)
+    G_auto = nx.Graph(adj_auto)
+    
+    # set attribute of inverse of cumulative weight (for path distance props)
+    nx.set_edge_attributes(G_manual, {(i,j): 1/adj_manual[j,i] if adj_manual[j,i]>0 else 0 for i in range(len(adj_manual)) for j in range(i)}, 'inv_weight')
+    nx.set_edge_attributes(G_auto, {(i,j): 1/adj_auto[j,i] if adj_auto[j,i]>0 else 0 for i in range(len(adj_auto)) for j in range(i)}, 'inv_weight')
+    
+    # select connencted components
+    cc_manual = sorted(nx.connected_components(G_manual), key=len, reverse=True)
+    cc_auto = sorted(nx.connected_components(G_auto), key=len, reverse=True)
+    GC_manual = G_manual.subgraph(cc_manual[0])
+    GC_auto = G_auto.subgraph(cc_auto[0])
+    
+    # save properties
+    def G_prop(G,start,end,name):
+        best_partition = community.best_partition(G,weight='weight', randomize=False)
+        return {'type': name,
+                'start': fm.Time.ToDateTime(start), 
+                'end': end, 
+                'MOD': community.modularity(best_partition, G), 
+                '#part': np.max(list(best_partition.values())) + 1,
+                'DEN': nx.density(G), 
+                'wDIA': nx.diameter(G, e=nx.eccentricity(G, sp=dict(nx.shortest_path_length(G,weight='inv_weight')))), 
+                'DIA': nx.diameter(G),
+                'DEH': statistics.pvariance([G.degree(n) for n in G.nodes()])}
+    
+    prop_df = prop_df.append(G_prop(GC_manual, start, end, 'manual'), ignore_index=True)
+    prop_df = prop_df.append(G_prop(GC_auto, start, end, 'auto'), ignore_index=True)
+
+# NETWORK PROP PLOTTING
+#%%%
 
 
-
-
+sns.lineplot(data=prop_df, x="start", y="MOD", markers=True, hue='type', marker=True, style='type',markersize=20)
+plt.title(' from: ' + str(start) + ',\n cumulated time : ' +str(time_win) + ' s, max_gap: ' + str(max_gap) + ' s, interaction tresh:'+str(min_cum_duration)+' s' )
 
 
 
