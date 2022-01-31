@@ -398,10 +398,10 @@ for net in range(num_net):
 # NETWORK PROP PLOTTING
 #%%%
 
-
-sns.lineplot(data=prop_df, x="start", y="MOD", markers=True, hue='type', marker=True, style='type',markersize=20)
-plt.title(' from: ' + str(start) + ',\n cumulated time : ' +str(time_win) + ' s, max_gap: ' + str(max_gap) + ' s, interaction tresh:'+str(min_cum_duration)+' s' )
-
+p ='MOD'
+sns.lineplot(data=prop_df, x="start", y=p, markers=True, hue='type', marker=True, style='type',markersize=20)
+plt.title(p+'\n from: ' + str(start) + ',\n cumulated time : ' +str(time_win) + ' s, max_gap: ' + str(max_gap) + ' s, interaction tresh:'+str(min_cum_duration)+' s' )
+plt.xticks(rotation=45)
 
 
 
