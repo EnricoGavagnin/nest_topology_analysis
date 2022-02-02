@@ -19,19 +19,19 @@ import community
 import statistics
 
 # link to folder with data and myrmidon files
-working_dir = '/media/eg15396/EG_DATA-2/NTM/'
+#working_dir = '/media/eg15396/EG_DATA-2/NTM/'
 #working_dir = '/home/eg15396/Documents/Data/NTM/'
-#orking_dir = '/home/eg15396/Documents/Data/Adriano/'
+working_dir = '/home/eg15396/Documents/Data/Adriano/'
 
 # name auto-oriented myrmidon file
-auto_orient = 'NTM_s27_auto_orient.myrmidon'
-#auto_orient = 'R3SP_13-03-21_automatically_oriented.myrmidon'
+#auto_orient = 'NTM_s27_auto_orient.myrmidon'
+auto_orient = 'R3SP_13-03-21_automatically_oriented.myrmidon'
 
 # name auto-oriented myrmidon file
-manual_orient = 'NTM_s27_man_orient.myrmidon'
-#manual_orient = 'R3SP_13-03-21_Capsule_Zones_defined.myrmidon'
+#manual_orient = 'NTM_s27_man_orient.myrmidon'
+manual_orient = 'R3SP_13-03-21_Capsule_Zones_defined.myrmidon'
 
-box_name = 'polyakov'
+box_name = ''
 
 frm_rate = 6
 # % Load experiment
@@ -56,7 +56,7 @@ angles_manual = [ants_manual[a].Identifications[0].AntAngle for a in ants_manual
 angles_err = [normalize(angles_auto[i] - angles_manual[i], -np.pi, np.pi) for i in range(len(angles_manual))]
 
 
-sns.set(font_scale = 2)
+sns.set(font_scale = 1)
 
 # plot angles difference
 ax = circular_hist(angles_err, title='Tag-position angle error\n' + box_name)
@@ -105,7 +105,7 @@ ax2 = sns.histplot(length_pxl_manual)
 ax2.set(xlabel='Head-Tail measurement (pixel)', ylabel='count')
 plt.text(170,30,'mean={:.1f}\n'.format(np.mean(list(length_pxl_manual.values()))) + ' var={:.1f}\n'.format(np.var(list(length_pxl_manual.values()))))
 plt.title(box_name)
-plt.xlim([160,260])
+plt.xlim([100,180])
 plt.ylim([0,40])
 
 # %% Collision pattern
@@ -131,15 +131,16 @@ coll_m_a = [list(set.difference(set(coll_frame_manual[f]),set(coll_frame_auto[f]
 coll_a_m = [list(set.difference(set(coll_frame_auto[f]),set(coll_frame_manual[f]))) for f in range(len(coll_frame_auto))]
 coll_aum = [list(set.union(set(coll_frame_manual[f]),set(coll_frame_auto[f]))) for f in range(len(coll_frame_auto))]
 
-coll_relative_err = [100 * (len(coll_m_a[i]) + len(coll_a_m[i])) / len(coll_aum[i]) for i in range(len(coll_aum)) if len(coll_aum[i])>0]
+#coll_relative_err = [100 * (len(coll_m_a[i]) + len(coll_a_m[i])) / len(coll_aum[i]) for i in range(len(coll_aum)) if len(coll_aum[i])>0]
+coll_relative_err = [len(coll_aum[i])  for i in range(len(coll_aum)) if len(coll_aum[i])>0]
 
 
 # % plot mismatch per frame
 plt.figure()
 sns.set(font_scale = 4)
-ax = sns.histplot(coll_relative_err,bins=50)
-plt.xlim([0, 55])
-plt.ylim([0, 3700])
+ax = sns.histplot(coll_relative_err)
+#plt.xlim([0, 55])
+#plt.ylim([0, 3700])
 ax.set(xlabel='Mismatched interactions per frame (%)', ylabel='frames')
 plt.title(box_name + '\n from: ' + str(start) + '\n to: ' +str(end) + '\n mean={:.1f}, '.format(np.mean(coll_relative_err)) + ' var={:.1f} '.format(np.var(coll_relative_err)))
 
@@ -261,7 +262,7 @@ ax.figure.colorbar(sm, shrink=0.8, label='HT-length (pixels)', cax=cax,orientati
 # ------- parameters -----------
 
 # cumulative time window (s)
-time_win = 60 * 30
+time_win = 60 * 120
 
 # maximum gap (s) for interaction computation
 max_gap = 20
@@ -337,13 +338,13 @@ plt.text(-2.4,1,box_name + ', max gap = ' + str(max_gap) + 's, min edge = ' +str
 # ------- parameters -----------
 
 # cumulative time window (s)
-time_win = 60 * 30
+time_win = 60 * 1200
 
 # number of networks computed
-num_net = 20
+num_net = 10
 
 # maximum gap (s) for interaction computation
-max_gap = 20
+max_gap = 10
 
 # minimum cumulative interaction duration (s)
 min_cum_duration = 10
@@ -354,7 +355,7 @@ min_cum_duration = 10
 prop_df = pd.DataFrame(columns=[])
 
 # start and end time of interaction computed
-t0 = fm.Query.GetDataInformations(e_manual).Start.Add(fm.Duration(23*3600*10**9))
+t0 = fm.Query.GetDataInformations(e_manual).Start.Add(fm.Duration(1*3600*10**9))
 
 
 for net in range(num_net):
