@@ -19,19 +19,21 @@ import community
 import statistics
 
 # link to folder with data and myrmidon files
-#working_dir = '/media/eg15396/EG_DATA-2/NTM/'
-working_dir = '/home/eg15396/Documents/Data/NTM/'
+working_dir = '/media/eg15396/EG_DATA-2/NTM/'
+#working_dir = '/home/eg15396/Documents/Data/NTM/'
 #orking_dir = '/home/eg15396/Documents/Data/Adriano/'
 
 # name auto-oriented myrmidon file
-auto_orient = 'NTM_s30_auto_orient.myrmidon'
+auto_orient = 'NTM_s27_auto_orient.myrmidon'
 #auto_orient = 'R3SP_13-03-21_automatically_oriented.myrmidon'
 
 # name auto-oriented myrmidon file
-manual_orient = 'NTM_s30_man_orient.myrmidon'
+manual_orient = 'NTM_s27_man_orient.myrmidon'
 #manual_orient = 'R3SP_13-03-21_Capsule_Zones_defined.myrmidon'
 
+box_name = 'polyakov'
 
+frm_rate = 6
 # % Load experiment
 
 # open experiments
@@ -53,8 +55,11 @@ angles_manual = [ants_manual[a].Identifications[0].AntAngle for a in ants_manual
 # compute angles errors module [-pi, pi)
 angles_err = [normalize(angles_auto[i] - angles_manual[i], -np.pi, np.pi) for i in range(len(angles_manual))]
 
+
+sns.set(font_scale = 2)
+
 # plot angles difference
-ax = circular_hist(angles_err, title='Tag-position angle error\n (leamas)')
+ax = circular_hist(angles_err, title='Tag-position angle error\n' + box_name)
 
 
 # %% Ant offset
@@ -80,22 +85,28 @@ offset_err = np.array([offset_auto_ant[i] - offset_manual_ant[i] for i in range(
 data = pd.DataFrame({
     'x-offset (pixel)': offset_err[:,0],
     'y-offset (pixel)': offset_err[:,1],})
-lim = np.max(abs(offset_err))*1.1
+lim = 50# np.max(abs(offset_err))*1.1
+
+sns.set(font_scale = 1)
 ax1 = sns.jointplot(data=data,x='x-offset (pixel)',y='y-offset (pixel)', xlim=(-lim,lim), ylim=(-lim,lim))
 plt.text(0.8*lim,-0.9*lim,'y-mean={:.2f}\n'.format(offset_err[:,1].mean()) + 'y-var={:.2f}'.format(offset_err[:,1].var()), rotation=-90)
-plt.text(-2.5*lim,1.3*lim,'x-mean={:.2f}\n'.format(offset_err[:,0].mean()) + 'x-var={:.2f}'.format(offset_err[:,0].var()))
-
+plt.text(-1.5*lim,1.2*lim,'x-mean={:.2f}\n'.format(offset_err[:,0].mean()) + 'x-var={:.2f}'.format(offset_err[:,0].var()))
+plt.title(box_name)
 
 # %% Ant length
 
 # read length of ants in pixel
 length_pxl_manual = {a: np.mean([fm.Query.ComputeMeasurementFor(e_manual,antID=ants_manual[a].ID,measurementTypeID=1)[i].LengthPixel for i in range(2)])  for a in ants_manual}
 
+sns.set(font_scale = 2.5)
+plt.figure()
 # plot ant length distribution
 ax2 = sns.histplot(length_pxl_manual)
 ax2.set(xlabel='Head-Tail measurement (pixel)', ylabel='count')
 plt.text(170,30,'mean={:.1f}\n'.format(np.mean(list(length_pxl_manual.values()))) + ' var={:.1f}\n'.format(np.var(list(length_pxl_manual.values()))))
-
+plt.title(box_name)
+plt.xlim([160,260])
+plt.ylim([0,40])
 
 # %% Collision pattern
 
@@ -103,7 +114,7 @@ plt.text(170,30,'mean={:.1f}\n'.format(np.mean(list(length_pxl_manual.values()))
 start = fm.Query.GetDataInformations(e_manual).Start.Add(fm.Duration(23*3600*10**9))
 end = start.Add(fm.Duration(2*3600*10**9))
 
-#%%
+#%
 # compute ant interaction
 #[trj_man, coll_list_manual] = fm.Query.ComputeAntInteractions(e_manual, start=start, end=end)
 #[trj_auto, coll_list_auto] = fm.Query.ComputeAntInteractions(e_auto, start=start, end=end)
@@ -123,12 +134,16 @@ coll_aum = [list(set.union(set(coll_frame_manual[f]),set(coll_frame_auto[f]))) f
 coll_relative_err = [100 * (len(coll_m_a[i]) + len(coll_a_m[i])) / len(coll_aum[i]) for i in range(len(coll_aum)) if len(coll_aum[i])>0]
 
 
-# %% plot ant length distribution
+# % plot mismatch per frame
+plt.figure()
+sns.set(font_scale = 4)
 ax = sns.histplot(coll_relative_err,bins=50)
+plt.xlim([0, 55])
+plt.ylim([0, 3700])
 ax.set(xlabel='Mismatched interactions per frame (%)', ylabel='frames')
-plt.title(' from: ' + str(start) + '\n to: ' +str(end) + '\n mean={:.1f}, '.format(np.mean(coll_relative_err)) + ' var={:.1f} '.format(np.var(coll_relative_err)))
+plt.title(box_name + '\n from: ' + str(start) + '\n to: ' +str(end) + '\n mean={:.1f}, '.format(np.mean(coll_relative_err)) + ' var={:.1f} '.format(np.var(coll_relative_err)))
 
-# %% Correlation ant length and collision mismatch
+# % Correlation ant length and collision mismatch
 
 # collision detection scores per individual ants
 # List of all interactions, grouped by manual\auto, auto\manual and manual U auto
@@ -148,11 +163,12 @@ coll_ant = {id:[((np.array(all_coll_m_a) // 10**4)==id).sum() + ((np.array(all_c
 coll_ant_relative_err = pd.DataFrame([[ant, 100 * coll_ant[ant][0] / coll_ant[ant][2], 100 * coll_ant[ant][1] / coll_ant[ant][2], length_pxl_manual[ant]] for ant in coll_ant if coll_ant[ant][2]>0], columns=['ID', 'manual_collisions (%)', 'auto_collisions (%)', 'HT-length (pixels)'])
 
 # scatter plot with color gradient as HT length
+plt.figure()
 fig, ax = plt.subplots()
-sns.set(font_scale = 2)
-sns.scatterplot(data=coll_ant_relative_err, x='manual_collisions (%)',y='auto_collisions (%)',hue='HT-length (pixels)', s=120, palette=('rocket'), ax=ax)
+sns.set(font_scale = 3.5)
+sns.scatterplot(data=coll_ant_relative_err, x='manual_collisions (%)',y='auto_collisions (%)',hue='HT-length (pixels)', s=220, palette=('rocket'), ax=ax)
 ax.set(ylim=(0,None), xlim=(0,None))
-plt.title(' from: ' + str(start) + '\n to: ' +str(end) )
+plt.title(box_name + '\n from: ' + str(start) + '\n to: ' +str(end) )
 
 # add colorbar
 norm = plt.Normalize(coll_ant_relative_err['HT-length (pixels)'].min(), coll_ant_relative_err['HT-length (pixels)'].max())
@@ -165,79 +181,78 @@ cax = fig.add_axes([0.27, 0.8, 0.5, 0.05])
 ax.figure.colorbar(sm, shrink=0.8, label='HT-length (pixels)', cax=cax,orientation='horizontal')
 
 
-# %% Interaction comparison
+# %% Interaction pattern comparison
+# # 
+# # start and end time of interaction computed
+# start = fm.Query.GetDataInformations(e_manual).Start.Add(fm.Duration(23*3600*10**9))
+# end = start.Add(fm.Duration(0.5*3600*10**9))
 
-# start and end time of interaction computed
-start = fm.Query.GetDataInformations(e_manual).Start.Add(fm.Duration(23*3600*10**9))
-end = start.Add(fm.Duration(0.5*3600*10**9))
+
+# # Dictionary to convert timestamp of frame into corresponding frame number starting from 1 (with frame#1 at 'start' time)  (@Adriano this is of interest for you)
+# TimeToFrame = {fm.Time.ToTimestamp(frm[0].FrameTime): i + 1 for i,frm in enumerate(fm.Query.CollideFrames(e_manual,start=start,end=end))}
+# N_frm = len(TimeToFrame)
+
+# # maximum gap (s) for interaction computation
+# max_gap = 20
+# int_err_per_frame = []
+
+# #for mg_i, max_gap in enumerate(range(1,20)):  # loop over different values of max_gap (@Adriano you can skip this)
+
+# # pointer to list of all the possible ids pairs ordered 
+# ids_pairs = [id1*10**4 + id2 for id1 in range(1,len(ants_auto)) for id2 in range(id1 + 1,len(ants_auto) + 1)]
+# ids_pairs = {k: i for i,k in enumerate(ids_pairs)} 
 
 
-# Dictionary to convert timestamp of frame into corresponding frame number starting from 1 (with frame#1 at 'start' time)
-TimeToFrame = {fm.Time.ToTimestamp(frm[0].FrameTime): i + 1 for i,frm in enumerate(fm.Query.CollideFrames(e_manual,start=start,end=end))}
-N_frm = len(TimeToFrame)
+# # inisialize interaction matrix each rows represent a binary array, one for each ids pairs, with 1s on the interactions and 0s elsewhere
+# int_mat_manual = np.zeros((len(ids_pairs), N_frm + 2), dtype=bool)
+# int_mat_auto = np.zeros((len(ids_pairs), N_frm + 2), dtype=bool)
 
-# maximum gap (s) for interaction computation
-max_gap = 20
-int_err_per_frame = []
 
-for mg_i, max_gap in enumerate(range(1,200,3)):
-    print(max_gap)
+# # Manual
+# for i in fm.Query.ComputeAntInteractions(e_manual,start=start,end=end,maximumGap=fm.Duration(max_gap*10**9))[1]:
+#     ids = i.IDs[0]*10**4 + i.IDs[1]
+#     int_mat_manual[ids_pairs[ids]] += np.concatenate([np.zeros((1,TimeToFrame[fm.Time.ToTimestamp(i.Start)])), 
+#                                                np.ones((1,TimeToFrame[fm.Time.ToTimestamp(i.End)] - TimeToFrame[fm.Time.ToTimestamp(i.Start)] + 1)),
+#                                                np.zeros((1,N_frm - TimeToFrame[fm.Time.ToTimestamp(i.End)] + 1))], 1)[0].astype(bool)
 
-    # pointer to list of all the possible ids pairs ordered 
-    ids_pairs = [id1*10**4 + id2 for id1 in range(1,len(ants_auto)) for id2 in range(id1 + 1,len(ants_auto) + 1)]
-    ids_pairs = {k: i for i,k in enumerate(ids_pairs)} #NOT VERY NICE!! YOU CAN DO THIS IN ONE GO WITH PREVIOUS LINE (TO DO)
+# # Auto
+# for i in fm.Query.ComputeAntInteractions(e_auto,start=start,end=end,maximumGap=fm.Duration(max_gap*10**9))[1]:
+#     ids = i.IDs[0]*10**4 + i.IDs[1]
+#     int_mat_auto[ids_pairs[ids]] += np.concatenate([np.zeros((1,TimeToFrame[fm.Time.ToTimestamp(i.Start)])), 
+#                                                np.ones((1,TimeToFrame[fm.Time.ToTimestamp(i.End)] - TimeToFrame[fm.Time.ToTimestamp(i.Start)] + 1)),
+#                                                np.zeros((1,N_frm - TimeToFrame[fm.Time.ToTimestamp(i.End)] + 1))], 1)[0].astype(bool)
     
-    
-    # inisialize interaction matrix each rows represent a binary array, one for each ids pairs, with 1s on the interactions and 0s elsewhere
-    int_mat_manual = np.zeros((len(ids_pairs), N_frm + 2), dtype=bool)
-    int_mat_auto = np.zeros((len(ids_pairs), N_frm + 2), dtype=bool)
-    
-    
-    # Manual              <---- to improve: merge in one for loop!!
-    for i in fm.Query.ComputeAntInteractions(e_manual,start=start,end=end,maximumGap=fm.Duration(max_gap*10**9))[1]:
-        ids = i.IDs[0]*10**4 + i.IDs[1]
-        int_mat_manual[ids_pairs[ids]] += np.concatenate([np.zeros((1,TimeToFrame[fm.Time.ToTimestamp(i.Start)])), 
-                                                   np.ones((1,TimeToFrame[fm.Time.ToTimestamp(i.End)] - TimeToFrame[fm.Time.ToTimestamp(i.Start)] + 1)),
-                                                   np.zeros((1,N_frm - TimeToFrame[fm.Time.ToTimestamp(i.End)] + 1))], 1)[0].astype(bool)
-    
-    # Auto
-    for i in fm.Query.ComputeAntInteractions(e_auto,start=start,end=end,maximumGap=fm.Duration(max_gap*10**9))[1]:
-        ids = i.IDs[0]*10**4 + i.IDs[1]
-        int_mat_auto[ids_pairs[ids]] += np.concatenate([np.zeros((1,TimeToFrame[fm.Time.ToTimestamp(i.Start)])), 
-                                                   np.ones((1,TimeToFrame[fm.Time.ToTimestamp(i.End)] - TimeToFrame[fm.Time.ToTimestamp(i.Start)] + 1)),
-                                                   np.zeros((1,N_frm - TimeToFrame[fm.Time.ToTimestamp(i.End)] + 1))], 1)[0].astype(bool)
-        
-    int_mat_err = sparse.csr_matrix(int_mat_manual.astype(int) - int_mat_auto.astype(int))
-    
-    int_err_per_frame.append([(int_mat_err==1).sum() / N_frm, (int_mat_err==-1).sum() / N_frm])
+# int_mat_err = sparse.csr_matrix(int_mat_manual.astype(int) - int_mat_auto.astype(int))
+
+# int_err_per_frame.append([(int_mat_err==1).sum() / N_frm, (int_mat_err==-1).sum() / N_frm])
 
 
-# %% plot interaction matrix
-# max interaction to show
-ylim = 2000
+# # %% plot interaction matrix
+# # max interaction to show
+# ylim = 2000
 
-# show yticks every
-ytick_span = 70
-plt.imshow(200*int_mat_auto[:ylim,:], cmap='cividis')
-plt.grid(None)
-plt.xlabel('Frame')
-plt.ylabel('ant_pair')
-plt.title('AUTO - max gap = ' + str(max_gap) + 's \n from: ' + str(start) + '\n to: ' +str(end) )
-plt.yticks(range(0, ylim, ytick_span), ['(' + str(ids // 10**4) + ', ' + str(ids % 10**4) + ')' for ids in ids_pairs][:ylim:ytick_span])
+# # show yticks every
+# ytick_span = 70
+# plt.imshow(200*int_mat_auto[:ylim,:], cmap='cividis')
+# plt.grid(None)
+# plt.xlabel('Frame')
+# plt.ylabel('ant_pair')
+# plt.title('AUTO - max gap = ' + str(max_gap) + 's \n from: ' + str(start) + '\n to: ' +str(end) )
+# plt.yticks(range(0, ylim, ytick_span), ['(' + str(ids // 10**4) + ', ' + str(ids % 10**4) + ')' for ids in ids_pairs][:ylim:ytick_span])
 
 
-# %% plot interaction patter error
-# max interaction to show
-ylim = 2000
+# # %% plot interaction pattern error
+# # max interaction to show
+# ylim = 2000
 
-# show yticks every
-ytick_span = 70
-plt.imshow(200*int_mat_err[:ylim,:4000], cmap='cividis')
-plt.grid(None)
-plt.xlabel('Frame')
-plt.ylabel('ant_pair')
-plt.title('DIFFERENCE - max gap = ' + str(max_gap) + 's \n from: ' + str(start) + '\n to: ' +str(end) )
-plt.yticks(range(0, ylim, ytick_span), ['(' + str(ids // 10**4) + ', ' + str(ids % 10**4) + ')' for ids in ids_pairs][:ylim:ytick_span])
+# # show yticks every
+# ytick_span = 70
+# plt.imshow(200*int_mat_err[:ylim,:4000], cmap='cividis')
+# plt.grid(None)
+# plt.xlabel('Frame')
+# plt.ylabel('ant_pair')
+# plt.title('DIFFERENCE - max gap = ' + str(max_gap) + 's \n from: ' + str(start) + '\n to: ' +str(end) )
+# plt.yticks(range(0, ylim, ytick_span), ['(' + str(ids // 10**4) + ', ' + str(ids % 10**4) + ')' for ids in ids_pairs][:ylim:ytick_span])
 
 
 
@@ -252,14 +267,14 @@ time_win = 60 * 30
 max_gap = 20
 
 # minimum cumulative interaction duration (s)
-min_cum_duration = 100
+min_cum_duration = 10 
 
 # -----------------------------
 
 
 
 # start and end time of interaction computed
-start = fm.Query.GetDataInformations(e_manual).Start.Add(fm.Duration(23*3600*10**9))
+start = fm.Query.GetDataInformations(e_manual).Start.Add(fm.Duration(24*3600*10**9))
 end = start.Add(fm.Duration(time_win * 10**9))
 
 # Dictionary to convert timestamp of frame into corresponding frame number starting from 1 (with frame#1 at 'start' time)
@@ -280,8 +295,8 @@ for i in fm.Query.ComputeAntInteractions(e_auto,start=start,end=end,maximumGap=f
     adj_auto[i.IDs[0]-1, i.IDs[1]-1] += TimeToFrame[fm.Time.ToTimestamp(i.End)] - TimeToFrame[fm.Time.ToTimestamp(i.Start)]
 
 # trimming 
-adj_manual[adj_manual < min_cum_duration] = 0
-adj_auto[adj_auto < min_cum_duration] = 0
+adj_manual[adj_manual < min_cum_duration * frm_rate] = 0
+adj_auto[adj_auto < min_cum_duration * frm_rate] = 0
 
 # network build
 G_manual = nx.Graph(adj_manual)
@@ -297,6 +312,8 @@ GC_auto = G_auto.subgraph(Gcc_auto[0])
 
 #%% PLOTTING network comparison
 # starting node position for spring layout
+sns.set(font_scale = 2)
+plt.figure()
 start_pos = nx.random_layout(G_manual)
 
 # manual 
@@ -309,10 +326,11 @@ plt.title('MANUAL - CC = ' +str(len(Gcc_manual)))
 # auto
 pos = nx.spring_layout(GC_auto,  iterations=100, pos=start_pos)
 ax = plt.subplot(122)
-nx.draw(GC_auto, ax=ax, pos=pos)
+nx.draw(GC_auto, ax=ax, pos=pos, node_color='red')
 plt.title('AUTO - CC = ' +str(len(Gcc_auto)))
 
-plt.suptitle('max gap = ' + str(max_gap) + 's, min edge = ' +str(min_cum_duration) + 's  \n from: ' + str(start) + '\n to: ' +str(end))
+plt.text(-2.4,1,box_name + ', max gap = ' + str(max_gap) + 's, min edge = ' +str(min_cum_duration) + 's  \n from: ' + str(start) + '\n to: ' +str(end))
+#plt.tight_layout('off')
 
 # %% CUMULATIVE NETWORK PROPERTIES COMPARISON
 
@@ -327,8 +345,8 @@ num_net = 20
 # maximum gap (s) for interaction computation
 max_gap = 20
 
-# minimum cumulative interaction duration (frames)
-min_cum_duration = 10*6
+# minimum cumulative interaction duration (s)
+min_cum_duration = 10
 
 # -----------------------------
 
@@ -340,6 +358,7 @@ t0 = fm.Query.GetDataInformations(e_manual).Start.Add(fm.Duration(23*3600*10**9)
 
 
 for net in range(num_net):
+    print(net)
     start = t0.Add(fm.Duration(time_win * net * 10**9))
 
     end = t0.Add(fm.Duration(time_win * (net+1) * 10**9))
@@ -362,8 +381,8 @@ for net in range(num_net):
         adj_auto[i.IDs[0]-1, i.IDs[1]-1] += TimeToFrame[fm.Time.ToTimestamp(i.End)] - TimeToFrame[fm.Time.ToTimestamp(i.Start)]
     
     # trimming 
-    adj_manual[adj_manual < min_cum_duration] = 0
-    adj_auto[adj_auto < min_cum_duration] = 0
+    adj_manual[adj_manual < min_cum_duration * frm_rate] = 0
+    adj_auto[adj_auto < min_cum_duration * frm_rate] = 0
     
     # network build
     G_manual = nx.Graph(adj_manual)
@@ -397,13 +416,11 @@ for net in range(num_net):
 
 # NETWORK PROP PLOTTING
 #%%%
-
-p ='MOD'
-sns.lineplot(data=prop_df, x="start", y=p, markers=True, hue='type', marker=True, style='type',markersize=20)
-plt.title(p+'\n from: ' + str(start) + ',\n cumulated time : ' +str(time_win) + ' s, max_gap: ' + str(max_gap) + ' s, interaction tresh:'+str(min_cum_duration)+' s' )
-plt.xticks(rotation=45)
-
-
+for p in ['MOD','DIA','wDIA','#part','DEN','DEH']:
+    plt.figure()
+    sns.lineplot(data=prop_df, x="start", y=p, markers=True, hue='type', marker=True, style='type',markersize=20)
+    plt.title(box_name + '\n' + p+'\n from: ' + str(start) + ',\n cumulated time : ' +str(time_win) + ' s, max_gap: ' + str(max_gap) + ' s, interaction tresh:'+str(min_cum_duration)+' s' )
+    plt.xticks(rotation=45)
 
 
 
@@ -432,6 +449,8 @@ plt.xticks(rotation=45)
 
 
 
+
+ 
 
 
 
