@@ -20,16 +20,19 @@ import statistics
 
 # link to folder with data and myrmidon files
 #working_dir = '/media/eg15396/EG_DATA-2/NTM/'
-#working_dir = '/home/eg15396/Documents/Data/NTM/'
-working_dir = '/home/eg15396/Documents/Data/Adriano/'
+working_dir = '/home/eg15396/Documents/Data/NTM/'
+#working_dir = '/home/eg15396/Documents/Data/Adriano/'
 
 # name auto-oriented myrmidon file
-#auto_orient = 'NTM_s27_auto_orient.myrmidon'
-auto_orient = 'R3SP_13-03-21_automatically_oriented.myrmidon'
+auto_orient = 'NTM_s30_auto_orient.myrmidon'
+#auto_orient = 'R3SP_13-03-21_automatically_oriented.myrmidon'
 
 # name auto-oriented myrmidon file
-#manual_orient = 'NTM_s27_man_orient.myrmidon'
-manual_orient = 'R3SP_13-03-21_Capsule_Zones_defined.myrmidon'
+manual_orient = 'NTM_s30_man_orient.myrmidon'
+#manual_orient = 'R3SP_13-03-21_Capsule_Zones_defined.myrmidon'
+
+# plot scale factor
+plt_sf = 1
 
 box_name = ''
 
@@ -56,7 +59,7 @@ angles_manual = [ants_manual[a].Identifications[0].AntAngle for a in ants_manual
 angles_err = [normalize(angles_auto[i] - angles_manual[i], -np.pi, np.pi) for i in range(len(angles_manual))]
 
 
-sns.set(font_scale = 1)
+sns.set(font_scale = plt_sf)
 
 # plot angles difference
 ax = circular_hist(angles_err, title='Tag-position angle error\n' + box_name)
@@ -87,7 +90,7 @@ data = pd.DataFrame({
     'y-offset (pixel)': offset_err[:,1],})
 lim = 50# np.max(abs(offset_err))*1.1
 
-sns.set(font_scale = 1)
+sns.set(font_scale = plt_sf)
 ax1 = sns.jointplot(data=data,x='x-offset (pixel)',y='y-offset (pixel)', xlim=(-lim,lim), ylim=(-lim,lim))
 plt.text(0.8*lim,-0.9*lim,'y-mean={:.2f}\n'.format(offset_err[:,1].mean()) + 'y-var={:.2f}'.format(offset_err[:,1].var()), rotation=-90)
 plt.text(-1.5*lim,1.2*lim,'x-mean={:.2f}\n'.format(offset_err[:,0].mean()) + 'x-var={:.2f}'.format(offset_err[:,0].var()))
@@ -98,14 +101,14 @@ plt.title(box_name)
 # read length of ants in pixel
 length_pxl_manual = {a: np.mean([fm.Query.ComputeMeasurementFor(e_manual,antID=ants_manual[a].ID,measurementTypeID=1)[i].LengthPixel for i in range(2)])  for a in ants_manual}
 
-sns.set(font_scale = 2.5)
+sns.set(font_scale = plt_sf)
 plt.figure()
 # plot ant length distribution
 ax2 = sns.histplot(length_pxl_manual)
 ax2.set(xlabel='Head-Tail measurement (pixel)', ylabel='count')
 plt.text(170,30,'mean={:.1f}\n'.format(np.mean(list(length_pxl_manual.values()))) + ' var={:.1f}\n'.format(np.var(list(length_pxl_manual.values()))))
 plt.title(box_name)
-plt.xlim([100,180])
+plt.xlim([160,240])
 plt.ylim([0,40])
 
 # %% Collision pattern
@@ -131,13 +134,12 @@ coll_m_a = [list(set.difference(set(coll_frame_manual[f]),set(coll_frame_auto[f]
 coll_a_m = [list(set.difference(set(coll_frame_auto[f]),set(coll_frame_manual[f]))) for f in range(len(coll_frame_auto))]
 coll_aum = [list(set.union(set(coll_frame_manual[f]),set(coll_frame_auto[f]))) for f in range(len(coll_frame_auto))]
 
-#coll_relative_err = [100 * (len(coll_m_a[i]) + len(coll_a_m[i])) / len(coll_aum[i]) for i in range(len(coll_aum)) if len(coll_aum[i])>0]
-coll_relative_err = [len(coll_aum[i])  for i in range(len(coll_aum)) if len(coll_aum[i])>0]
+coll_relative_err = [100 * (len(coll_m_a[i]) + len(coll_a_m[i])) / len(coll_aum[i]) for i in range(len(coll_aum)) if len(coll_aum[i])>0]
 
 
 # % plot mismatch per frame
 plt.figure()
-sns.set(font_scale = 4)
+sns.set(font_scale = plt_sf)
 ax = sns.histplot(coll_relative_err)
 #plt.xlim([0, 55])
 #plt.ylim([0, 3700])
@@ -166,7 +168,7 @@ coll_ant_relative_err = pd.DataFrame([[ant, 100 * coll_ant[ant][0] / coll_ant[an
 # scatter plot with color gradient as HT length
 plt.figure()
 fig, ax = plt.subplots()
-sns.set(font_scale = 3.5)
+sns.set(font_scale = plt_sf)
 sns.scatterplot(data=coll_ant_relative_err, x='manual_collisions (%)',y='auto_collisions (%)',hue='HT-length (pixels)', s=220, palette=('rocket'), ax=ax)
 ax.set(ylim=(0,None), xlim=(0,None))
 plt.title(box_name + '\n from: ' + str(start) + '\n to: ' +str(end) )
@@ -262,7 +264,7 @@ ax.figure.colorbar(sm, shrink=0.8, label='HT-length (pixels)', cax=cax,orientati
 # ------- parameters -----------
 
 # cumulative time window (s)
-time_win = 60 * 120
+time_win = 60 * 30
 
 # maximum gap (s) for interaction computation
 max_gap = 20
@@ -313,21 +315,21 @@ GC_auto = G_auto.subgraph(Gcc_auto[0])
 
 #%% PLOTTING network comparison
 # starting node position for spring layout
-sns.set(font_scale = 2)
+sns.set(font_scale = plt_sf)
 plt.figure()
 start_pos = nx.random_layout(G_manual)
 
 # manual 
 pos = nx.spring_layout(GC_manual,  iterations=100, pos=start_pos)
 ax = plt.subplot(121)
-nx.draw(GC_manual, ax=ax, pos=pos)
+nx.draw(GC_manual, ax=ax, pos=pos, node_size=plt_sf*100, alpha=0.8)
 plt.title('MANUAL - CC = ' +str(len(Gcc_manual)))
 
 
 # auto
 pos = nx.spring_layout(GC_auto,  iterations=100, pos=start_pos)
 ax = plt.subplot(122)
-nx.draw(GC_auto, ax=ax, pos=pos, node_color='red')
+nx.draw(GC_auto, ax=ax, pos=pos, node_color='red', node_size=plt_sf*100, alpha=0.8)
 plt.title('AUTO - CC = ' +str(len(Gcc_auto)))
 
 plt.text(-2.4,1,box_name + ', max gap = ' + str(max_gap) + 's, min edge = ' +str(min_cum_duration) + 's  \n from: ' + str(start) + '\n to: ' +str(end))
@@ -338,7 +340,7 @@ plt.text(-2.4,1,box_name + ', max gap = ' + str(max_gap) + 's, min edge = ' +str
 # ------- parameters -----------
 
 # cumulative time window (s)
-time_win = 60 * 1200
+time_win = 60 * 30
 
 # number of networks computed
 num_net = 10
@@ -419,7 +421,7 @@ for net in range(num_net):
 #%%%
 for p in ['MOD','DIA','wDIA','#part','DEN','DEH']:
     plt.figure()
-    sns.lineplot(data=prop_df, x="start", y=p, markers=True, hue='type', marker=True, style='type',markersize=20)
+    sns.lineplot(data=prop_df, x="start", y=p, markers=True, hue='type', marker=True, style='type',markersize=10*plt_sf)
     plt.title(box_name + '\n' + p+'\n from: ' + str(start) + ',\n cumulated time : ' +str(time_win) + ' s, max_gap: ' + str(max_gap) + ' s, interaction tresh:'+str(min_cum_duration)+' s' )
     plt.xticks(rotation=45)
 
