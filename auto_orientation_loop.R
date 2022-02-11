@@ -17,7 +17,7 @@ dir_data <- '/media/eg15396/EG_DATA-3/NTM/'
 #### Loop through all the directories in the dir_folder
 data_dir_list =  list.files(path=dir_data, pattern=NULL, all.files=FALSE,full.names=FALSE)
 
-for (tracking_data_file in data_dir_list[8:166]){
+for (tracking_data_file in data_dir_list[50:166]){
   
   if (substring(tracking_data_file,16,17) != '.0') next
   
