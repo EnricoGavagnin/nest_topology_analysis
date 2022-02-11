@@ -15,6 +15,9 @@ import community
 import statistics
 import scipy.stats as stats
 from unidip import UniDip
+from os import listdir
+import pickle
+#%%
 
 # link to folder with data and myrmidon files
 working_dir = '/media/eg15396/EG_DATA-2/NTM/'
@@ -25,9 +28,11 @@ working_dir = '/media/eg15396/EG_DATA-2/NTM/'
 detection_data = dict()
 
 # name auto-oriented myrmidon file
-myrm_list = ['NTM_s28_auto_orient.myrmidon','NTM_s21_auto_orient.myrmidon']
+myrm_list = [ s for s in listdir(working_dir) if s[15:17] == '.m']
 
 for myrm_file in myrm_list:
+    
+    print(myrm_file)
     
     # open experiments
     exp = fm.Experiment.Open(working_dir + myrm_file)
@@ -38,8 +43,8 @@ for myrm_file in myrm_list:
     
     # start and end time of data processing
     start = fm.Query.GetDataInformations(exp).Start
-    end = start.Add(fm.Duration(4*3600*10**9))
-    #end = fm.Query.GetDataInformations(exp).End
+    #end = start.Add(fm.Duration(2*3600*10**9))
+    end = fm.Query.GetDataInformations(exp).End
     
     
     #
@@ -70,7 +75,15 @@ for myrm_file in myrm_list:
 
 
 
+# 
+
+# Save
+a_file = open("detection_data.pkl", "wb")
+pickle.dump(detection_data, a_file)
+a_file.close()
 
 
-
-
+# Open
+#a_file = open("detection_data.pkl", "rb")
+#output = pickle.load(a_file)
+#print(output)
