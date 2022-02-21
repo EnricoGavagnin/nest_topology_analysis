@@ -21,7 +21,7 @@ dir_data <- '/media/eg15396/EG_DATA-2/NTM/'
 defined_capsule_file <- 'manual_ref_leamas.myrmidon'
 
 ### automatically oriented myrmidon file name
-no_capsule_file <- 'manual_ref_polyakov.myrmidon'
+no_capsule_file <- 'EG_NTM_s25_DEHb.myrmidon'
 
 #################################################################################################################################################################################################################
 ###########STEP 1 - use manually oriented data to extract important information about AntPose and Capsules
@@ -113,7 +113,7 @@ for (i in 1:length(ants)){
   
   ant_length_px <- mean(fmQueryComputeMeasurementFor(tracking_data,antID=ants[[i]]$ID)$length_px)
   
-  
+  ants[[i]]$clearCapsules()
   for (caps in 1:length(capsule_list)){
     capsule_ratios <- capsule_list[[caps]]; names(capsule_ratios) <- gsub("_ratio","",names(capsule_ratios))
     capsule_coords <- ant_length_px*capsule_ratios

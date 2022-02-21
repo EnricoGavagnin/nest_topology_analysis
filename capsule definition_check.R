@@ -17,7 +17,7 @@ dir_data <- '/media/eg15396/EG_DATA-2/NTM/'
 #### Loop through all the directories in the dir_folder
 data_dir_list =  list.files(path=dir_data, pattern=NULL, all.files=FALSE,full.names=FALSE)
 
-for (tracking_data_file in data_dir_list[38:265]){
+for (tracking_data_file in data_dir_list[1:199]){
   
   #tracking_data_file <- 'EG_NTM_s39_DENb.0000'
   if (substring(tracking_data_file,16,17) != '.0') next
@@ -140,7 +140,7 @@ for (tracking_data_file in data_dir_list[38:265]){
   ###create ants
   tag_statistics <- fmQueryComputeTagStatistics(tracking_data)
   for ( i in 1:nrow(tag_statistics)) {  #####loop over each tag
-    if ( tag_statistics[i,"count"] >= 0.3*max(tag_statistics[,"count"],na.rm=T) & tag_statistics[i,"gap10h"]==0 ) { ### optional: here I decide to create an antID only if the tag detection rate was more than 1/1000 * the best tag detection rate. You can choose your own criterion
+    if ( tag_statistics[i,"count"] >= 0.1*max(tag_statistics[,"count"],na.rm=T) & tag_statistics[i,"gap10h"]==0 ) { ### optional: here I decide to create an antID only if the tag detection rate was more than 1/1000 * the best tag detection rate. You can choose your own criterion
       a <- tracking_data$createAnt(); ###this actually creates an antID, i.e. associates a decimal antID number to that particular tagID
       identification <- tracking_data$addIdentification(a$ID,tag_statistics[i,"tagDecimalValue"],fmTimeSinceEver(),fmTimeForever())
       #print(identification)
@@ -177,8 +177,8 @@ for (tracking_data_file in data_dir_list[38:265]){
   # to   <- fmTimeForever()
   
   ###option 3: if dataset is too large - too time consuming, use only 24 hours (for example)
-  from <- fmTimeCreate(offset=fmQueryGetDataInformations(tracking_data)$start + 12*3600 ) ###experiment start time
-  to   <- fmTimeCreate(offset=fmQueryGetDataInformations(tracking_data)$start + 24*3600  ) ###experiment start time
+  from <- fmTimeCreate(offset=fmQueryGetDataInformations(tracking_data)$start + 0*3600 ) ###experiment start time
+  to   <- fmTimeCreate(offset=fmQueryGetDataInformations(tracking_data)$start + 12*3600  ) ###experiment start time
   
   ###option 4:..... whateever makes most sense 
   
