@@ -20,7 +20,7 @@ import pickle
 #%%
 
 # link to folder with data and myrmidon files
-working_dir = '/media/eg15396/EG_DATA-2/NTM/'
+working_dir = '/media/eg15396/EG_DATA-3/NTM/'
 #working_dir = '/home/eg15396/Documents/Data/NTM/'
 
 
@@ -31,6 +31,9 @@ detection_data = dict()
 myrm_list = [ s for s in listdir(working_dir) if s[15:17] == '.m']
 
 for myrm_file in myrm_list:
+    
+    if myrm_file=='EG_NTM_s36_DENa.myrmidon':
+        continue
     
     print(myrm_file)
     

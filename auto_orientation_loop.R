@@ -12,15 +12,15 @@ library(R.utils)
 sourceCpp("/home/eg15396/Documents/codes/R_scripts/Automated_Ant_Orientation_Nathalie/Get_Movement_Angle.cpp")
 
 ### directory of data and myrmidon files
-dir_data <- '/media/eg15396/EG_DATA-2/NTM/'
+dir_data <- '/media/eg15396/EG_DATA-3/NTM/'
 
 #### Loop through all the directories in the dir_folder
 data_dir_list =  list.files(path=dir_data, pattern=NULL, all.files=FALSE,full.names=FALSE)
 
 for (tracking_data_file in data_dir_list[38:265]){
   
-  #tracking_data_file <- 'EG_NTM_s39_DENb.0000'
-  if (substring(tracking_data_file,16,17) != '.0') next
+  tracking_data_file <- 'EG_NTM_s36_DENa.0000'
+  if (substring(tracking_data_file,16,20) != '.0000') next
   
   print(tracking_data_file)
   ### automatically oriented myrmidon file name
@@ -135,6 +135,8 @@ for (tracking_data_file in data_dir_list[38:265]){
   
   ###add tracking data directory
   tddURI <- tracking_data$addTrackingDataDirectory(s$ID,paste(dir_data,tracking_data_file,sep=''))
+  if (tracking_data_file == 'EG_NTM_s36_DENa.0000')
+    tddURI2 <- tracking_data$addTrackingDataDirectory(s$ID,paste(dir_data,'EG_NTM_s36_DENa.0001',sep=''))
   tracking_data$save(paste(dir_data,auto_orient_file,sep='')) # file now exists
   
   ###create ants
