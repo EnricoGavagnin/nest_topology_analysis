@@ -12,15 +12,17 @@ library(R.utils)
 sourceCpp("/home/eg15396/Documents/codes/R_scripts/Automated_Ant_Orientation_Nathalie/Get_Movement_Angle.cpp")
 
 ### directory of data and myrmidon files
-dir_data <- '/media/eg15396/EG_DATA-3/NTM/'
+dir_data <- '/media/eg15396/EG_DATA-7/NTM/'
 
 #### Loop through all the directories in the dir_folder
 data_dir_list =  list.files(path=dir_data, pattern=NULL, all.files=FALSE,full.names=FALSE)
 
-for (tracking_data_file in data_dir_list[38:265]){
+for (tracking_data_file in data_dir_list){
   
-  tracking_data_file <- 'EG_NTM_s36_DENa.0000'
-  if (substring(tracking_data_file,16,20) != '.0000') next
+  #tracking_data_file <- 'EG_NTM_s36_DENa.0001'
+  if (substring(tracking_data_file,16,17) != '.0') next
+  
+  if (tracking_data_file == 'EG_NTM_s36_DENa.0000') next
   
   print(tracking_data_file)
   ### automatically oriented myrmidon file name
@@ -30,6 +32,8 @@ for (tracking_data_file in data_dir_list[38:265]){
   
   # get subset number 
   rep <- as.numeric(substring(tracking_data_file,9,10))
+  
+  if (rep < 23) next
   
   # list of tracking systems
   tracking_systems <- list('karla','esterhase','leamas','polyakov')
@@ -135,14 +139,12 @@ for (tracking_data_file in data_dir_list[38:265]){
   
   ###add tracking data directory
   tddURI <- tracking_data$addTrackingDataDirectory(s$ID,paste(dir_data,tracking_data_file,sep=''))
-  if (tracking_data_file == 'EG_NTM_s36_DENa.0000')
-    tddURI2 <- tracking_data$addTrackingDataDirectory(s$ID,paste(dir_data,'EG_NTM_s36_DENa.0001',sep=''))
   tracking_data$save(paste(dir_data,auto_orient_file,sep='')) # file now exists
   
   ###create ants
   tag_statistics <- fmQueryComputeTagStatistics(tracking_data)
   for ( i in 1:nrow(tag_statistics)) {  #####loop over each tag
-    if ( tag_statistics[i,"count"] >= 0.3*max(tag_statistics[,"count"],na.rm=T) & tag_statistics[i,"gap10h"]==0 ) { ### optional: here I decide to create an antID only if the tag detection rate was more than 1/1000 * the best tag detection rate. You can choose your own criterion
+    if ( tag_statistics[i,"count"] >= 0.2*max(tag_statistics[,"count"],na.rm=T) & tag_statistics[i,"gap10h"]==0 ) { ### optional: here I decide to create an antID only if the tag detection rate was more than 1/1000 * the best tag detection rate. You can choose your own criterion
       a <- tracking_data$createAnt(); ###this actually creates an antID, i.e. associates a decimal antID number to that particular tagID
       identification <- tracking_data$addIdentification(a$ID,tag_statistics[i,"tagDecimalValue"],fmTimeSinceEver(),fmTimeForever())
       #print(identification)
@@ -179,8 +181,8 @@ for (tracking_data_file in data_dir_list[38:265]){
   # to   <- fmTimeForever()
   
   ###option 3: if dataset is too large - too time consuming, use only 24 hours (for example)
-  from <- fmTimeCreate(offset=fmQueryGetDataInformations(tracking_data)$start + 12*3600 ) ###experiment start time
-  to   <- fmTimeCreate(offset=fmQueryGetDataInformations(tracking_data)$start + 24*3600  ) ###experiment start time
+  from <- fmTimeCreate(offset=fmQueryGetDataInformations(tracking_data)$end - 12*3600 ) ###experiment start time
+  to   <- fmTimeCreate(offset=fmQueryGetDataInformations(tracking_data)$end + 0*3600  ) ###experiment start time
   
   ###option 4:..... whateever makes most sense 
   
@@ -200,9 +202,14 @@ for (tracking_data_file in data_dir_list[38:265]){
   
   for (i in 1:length(ants)){
     
-    
+    aux <- positions$trajectories_summary$antID==ants[[i]]$ID
+    if (sum(aux)==0) {
+      print('ERROR IN' )
+      print(i)
+      next}
+      
     ####to be fool proof, and be sure you extract the trajectory corresponding the correct ant, make sure you make use of the antID_str column!
-    traj <- positions$trajectories [[   positions$trajectories_summary[which(positions$trajectories_summary$antID==ants[[i]]$ID),"antID_str"]    ]]
+    traj <- positions$trajectories [[   positions$trajectories_summary[which(aux),"antID_str"]    ]]
     
     ###feed traj to c++ program
     traj <- cbind(traj,add_angles(traj,max_time_gap,min_dist_moved))
