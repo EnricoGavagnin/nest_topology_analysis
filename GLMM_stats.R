@@ -1,8 +1,25 @@
 rm(list=ls())
-
-library(Matrix)
 library(lme4)
 library(car)
+
+dat <- read.csv("NTM_df_stats.csv",header=T,stringsAsFactors = F)
+lmer_p_list <- c('MOD','wDIA')   # list of properties for the LMER test
+pv_list <- integer(0)
+
+for (prop in lmer_p_list){
+  
+  model <- lmer(formula(paste(prop,' ~ exp + (1|colony)+(1|rep)+(1|h)')), data = dat)
+  #print(summary(model))
+  pv_list <- c(pv_list, print(as.numeric(Anova(model)["exp","Pr(>Chisq)"])))
+}
+
+
+#pv_list <- c(0.2, 0.2, 0.1, 0.045)
+pv_adj <- p.adjust(pv_list, method="BH")
+
+
+
+#----------------------
 
 setwd("/home/eg15396/Documents/GitHub/auto_vs_manual_orientation_check")
 
